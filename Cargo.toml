@@ -1,0 +1,22 @@
+[package]
+name = "robust-ntrip-client"
+description = "NTRIP client which supports robust reconnection"
+authors = ["Andrew Straw <strawman@astraw.com>"]
+edition = "2024"
+rust-version = "1.85"
+version = "0.1.0"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+bytes = "1.10.1"
+eyre = "0.6.12"
+http = "1.3.1"
+reqwest = { version = "0.12.15", default-features = false }
+rtcm-rs = { version = "0.11.0", default-features = false }
+serde = "1.0.219"
+tokio = "1.32.0"
+tracing = "0.1.41"
+
+[dev-dependencies]
+tracing-subscriber = { version = "0.3.18", features = ["env-filter", "time"] }
+tokio = { version = "1.32.0", features = ["macros", "rt", "rt-multi-thread"] }
