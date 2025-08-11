@@ -2,6 +2,7 @@
 name = "robust-ntrip-client"
 description = "NTRIP client which supports robust reconnection"
 authors = ["Andrew Straw <strawman@astraw.com>"]
+repository = "https://github.com/strawlab/robust-ntrip-client"
 edition = "2024"
 rust-version = "1.85"
 version = "0.1.0"

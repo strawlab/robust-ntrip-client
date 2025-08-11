@@ -1,3 +1,7 @@
+[![Crates.io](https://img.shields.io/crates/v/robust-ntrip-client.svg)](https://crates.io/crates/robust-ntrip-client)
+[![Documentation](https://docs.rs/robust-ntrip-client/badge.svg)](https://docs.rs/robust-ntrip-client/)
+[![Crate License](https://img.shields.io/crates/l/robust-ntrip-client.svg)](https://crates.io/crates/robust-ntrip-client)
+
 # robust-ntrip-client
 
 Rust client library to connect to Network Transport of RTCM via Internet
