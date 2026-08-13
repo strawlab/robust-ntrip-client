@@ -328,6 +328,7 @@ fn test_parse_example_url_with_user_pass() {
     assert_eq!(path_and_query.path(), "/mountpoint");
 }
 
+#[cfg(test)]
 #[tokio::test]
 async fn reconnect_retries_a_truncated_first_chunk() {
     use std::io::{Read, Write};

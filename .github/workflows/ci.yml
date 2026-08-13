@@ -26,3 +26,5 @@ jobs:
         run: cargo check --all-targets
       - name: Test
         run: cargo test --all-targets
+      - name: Verify package
+        run: cargo package
