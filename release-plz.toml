@@ -1,5 +1,7 @@
 [workspace]
-# Publish only after the release PR is merged, not after every push to main.
+# Publish only after a release PR is merged, not after every push to main.
+# CI-recovery PR branches must also start with `release-plz-` so release-plz
+# recognizes their merge as authorization to retry an unpublished version.
 release_always = false
 repo_url = "https://github.com/strawlab/robust-ntrip-client"
 # Preserve this repository's existing v0.1.0, v0.1.1, ... tag convention.
