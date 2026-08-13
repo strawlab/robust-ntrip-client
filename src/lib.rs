@@ -193,20 +193,34 @@ impl RobustNtripClient {
     }
 
     async fn reconnect_and_get_first_chunk(&mut self) -> Result<bytes::Bytes> {
-        let response = establish_connection(
-            &self.client,
-            &self.request_url,
-            self.user_pass.as_ref(),
-            self.max_backoff_duration,
-        )
-        .await?;
-        self.response = response;
-        let chunk = self
-            .response
-            .chunk()
-            .await?
-            .ok_or_else(|| eyre::eyre!("Could not get first chunk"))?;
-        Ok(chunk)
+        let mut backoff = min_dur(std::time::Duration::from_secs(1), self.max_backoff_duration);
+        loop {
+            self.response = establish_connection(
+                &self.client,
+                &self.request_url,
+                self.user_pass.as_ref(),
+                self.max_backoff_duration,
+            )
+            .await?;
+
+            match self.response.chunk().await {
+                Ok(Some(chunk)) => return Ok(chunk),
+                Ok(None) => {
+                    tracing::warn!(
+                        "NTRIP stream ended before yielding data after reconnect; retrying."
+                    );
+                }
+                Err(error) => {
+                    tracing::warn!(
+                        %error,
+                        "Error reading NTRIP stream after reconnect; retrying."
+                    );
+                }
+            }
+
+            tokio::time::sleep(backoff).await;
+            backoff = min_dur(backoff * 2, self.max_backoff_duration);
+        }
     }
 }
 
@@ -288,7 +302,7 @@ fn test_parse_example_url() {
     let authority = uri.authority().unwrap();
     assert_eq!(authority.host(), "hostname.com");
     assert_eq!(authority.port_u16(), Some(2101));
-    let (host_port, user_pass) = parse_authority(&authority).unwrap();
+    let (host_port, user_pass) = parse_authority(authority).unwrap();
     assert!(user_pass.is_none());
     assert_eq!(host_port, "hostname.com:2101");
     let path_and_query = uri.path_and_query().unwrap();
@@ -305,13 +319,53 @@ fn test_parse_example_url_with_user_pass() {
     let authority = uri.authority().unwrap();
     assert_eq!(authority.host(), "hostname.com");
     assert_eq!(authority.port_u16(), Some(2101));
-    let (host_port, user_pass) = parse_authority(&authority).unwrap();
+    let (host_port, user_pass) = parse_authority(authority).unwrap();
     let (username, password) = user_pass.unwrap();
     assert_eq!(username, "username");
     assert_eq!(password, "password");
     assert_eq!(host_port, "hostname.com:2101");
     let path_and_query = uri.path_and_query().unwrap();
     assert_eq!(path_and_query.path(), "/mountpoint");
+}
+
+#[tokio::test]
+async fn reconnect_retries_a_truncated_first_chunk() {
+    use std::io::{Read, Write};
+
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let address = listener.local_addr().unwrap();
+    let server = std::thread::spawn(move || {
+        let responses: [&[u8]; 3] = [
+            b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n",
+            b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\ninvalid\r\n",
+            b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n4\r\ntest\r\n0\r\n\r\n",
+        ];
+
+        for response in responses {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut request = Vec::new();
+            let mut byte = [0_u8; 1];
+            while !request.ends_with(b"\r\n\r\n") {
+                stream.read_exact(&mut byte).unwrap();
+                request.push(byte[0]);
+            }
+            stream.write_all(response).unwrap();
+        }
+    });
+
+    let mut client = RobustNtripClient::new(
+        &format!("http://{address}/mountpoint"),
+        RobustNtripClientOptions {
+            max_backoff_duration: std::time::Duration::ZERO,
+            timeout: None,
+        },
+    )
+    .await
+    .unwrap();
+
+    let chunk = client.reconnect_and_get_first_chunk().await.unwrap();
+    assert_eq!(chunk, "test");
+    server.join().unwrap();
 }
 
 /// One valid frame of RTCM data from the NTRIP server.
